@@ -73,7 +73,7 @@ struct BreathingExerciseView: View {
                                     .position(particle.position)
                             }
                         }
-                        .blur(radius: 1.5) // 模糊边界
+                        // 模糊效果已移除
                         .scaleEffect(circleScale) // 整体缩放以同步呼吸
                         
                     }
@@ -83,9 +83,7 @@ struct BreathingExerciseView: View {
                         .font(.title2)
                         .fontWeight(.medium)
                         .foregroundColor(.teal)
-                        .padding()
-                        .background(Color.white.opacity(0.8))
-                        .cornerRadius(15)
+                        // 白色背景已移除
                 }
                 
                 Spacer()
@@ -129,13 +127,15 @@ struct BreathingExerciseView: View {
     }
     
     func setupParticles() {
+        guard ringParticles.isEmpty else { return } // 防止重复生成
+        
         // 初始化“土星环”粒子
-        for _ in 0..<300 {
+        for _ in 0..<600 { // 增加粒子数量
             let angle = Double.random(in: 0..<(2 * .pi))
             let radius = CGFloat.random(in: 90...110)
             let x = cos(angle) * radius + 150
             let y = sin(angle) * radius + 150
-            let particle = Particle(size: .random(in: 2...5), position: CGPoint(x: x, y: y), opacity: .random(in: 0.2...0.7))
+            let particle = Particle(size: .random(in: 1...3), position: CGPoint(x: x, y: y), opacity: .random(in: 0.2...0.7)) // 减小粒子大小
             ringParticles.append(particle)
         }
         
