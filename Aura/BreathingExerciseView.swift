@@ -32,8 +32,8 @@ struct BreathingExerciseView: View {
     let breathingPattern = [
         (name: "吸气", duration: 4.0, scale: 1.4),
         (name: "屏住呼吸", duration: 4.0, scale: 1.4),
-        (name: "呼气", duration: 5.0, scale: 1.0),
-        (name: "屏住呼吸", duration: 3.0, scale: 1.0)
+        (name: "呼气", duration: 4.0, scale: 1.0),
+        (name: "屏住呼吸", duration: 4.0, scale: 1.0)
     ]
 
     var body: some View {
@@ -132,8 +132,17 @@ struct BreathingExerciseView: View {
             }
             .padding()
         }
-        .onAppear(perform: setupParticles)
+        .onAppear {
+            setupParticles()
+            startIdleAnimation()
+        }
         .onDisappear(perform: stopBreathing)
+    }
+    
+    func startIdleAnimation() {
+        withAnimation(Animation.linear(duration: 60).repeatForever(autoreverses: false)) {
+            rotationAngle = .degrees(360)
+        }
     }
     
     func setupParticles() {
@@ -182,7 +191,7 @@ struct BreathingExerciseView: View {
         playBackgroundSound()
         runPhase(at: 0)
 
-        // 开始旋转动画
+        // 从当前角度平滑过渡到运动旋转
         withAnimation(Animation.linear(duration: 30).repeatForever(autoreverses: false)) {
             rotationAngle = .degrees(-360)
         }
@@ -221,6 +230,12 @@ struct BreathingExerciseView: View {
         withAnimation(.easeInOut(duration: 1.0)) {
             circleScale = 1.0
             rotationAngle = .zero // 重置旋转
+        }
+
+        // 1秒后恢复待机旋转
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            guard !isAnimating else { return }
+            startIdleAnimation()
         }
     }
     
