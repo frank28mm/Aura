@@ -1,23 +1,39 @@
 import SwiftUI
 import AVFoundation
 
+// 定义单个粒子的数据结构
+private struct Particle: Identifiable {
+    let id = UUID()
+    var size: CGFloat
+    var position: CGPoint
+    var opacity: Double
+}
+
 struct BreathingExerciseView: View {
+    // 动画状态
+    @State private var circleScale: CGFloat = 1.0
     @State private var isAnimating = false
+    
+    // 粒子状态
+    @State private var ringParticles: [Particle] = []
+    @State private var dustParticles: [Particle] = []
+    
+    // 呼吸阶段
     @State private var breathingPhase = "准备开始"
-    @State private var currentPhase = 0
-    @State private var timer: Timer?
+    
+    // 音效
     @State private var audioPlayer: AVAudioPlayer?
     @State private var selectedSound = "无"
-    
-    let breathingPattern = [
-        ("吸气", 4),
-        ("屏住呼吸", 4),
-        ("呼气", 4),
-        ("屏住呼吸", 4)
-    ]
-    
     let soundOptions = ["无", "小雨", "森林", "海浪"]
-    
+
+    // 呼吸模式: (阶段名称, 持续时间, 目标缩放比例)
+    let breathingPattern = [
+        (name: "吸气", duration: 4.0, scale: 1.4),
+        (name: "屏住呼吸", duration: 4.0, scale: 1.4),
+        (name: "呼气", duration: 5.0, scale: 1.0),
+        (name: "屏住呼吸", duration: 3.0, scale: 1.0)
+    ]
+
     var body: some View {
         ZStack {
             // 背景渐变
@@ -31,31 +47,38 @@ struct BreathingExerciseView: View {
             VStack(spacing: 30) {
                 Spacer()
                 
-                // 将标题、动画和提示文本组合成一个居中块
                 VStack(spacing: 40) {
-                    // 标题
                     Text("呼吸之锚")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.teal)
                     
-                    // 呼吸动画圆圈
+                    // 粒子动画区域
                     ZStack {
-                        Circle()
-                            .stroke(Color.teal.opacity(0.3), lineWidth: 2)
-                            .frame(width: 300, height: 300)
+                        // 背景里的“星尘”
+                        ForEach(dustParticles) { particle in
+                            Circle()
+                                .fill(Color.white.opacity(particle.opacity))
+                                .frame(width: particle.size, height: particle.size)
+                                .position(particle.position)
+                                .animation(isAnimating ? Animation.easeInOut(duration: Double.random(in: 2...4)).repeatForever() : .default, value: isAnimating)
+                        }
+
+                        // 构成“土星环”的粒子
+                        ZStack {
+                            ForEach(ringParticles) { particle in
+                                Circle()
+                                    .fill(Color.teal.opacity(particle.opacity))
+                                    .frame(width: particle.size, height: particle.size)
+                                    .position(particle.position)
+                            }
+                        }
+                        .blur(radius: 1.5) // 模糊边界
+                        .scaleEffect(circleScale) // 整体缩放以同步呼吸
                         
-                        Circle()
-                            .fill(Color.teal.opacity(0.6))
-                            .frame(width: isAnimating ? 280 : 100, height: isAnimating ? 280 : 100)
-                            .animation(
-                                Animation.easeInOut(duration: 4)
-                                    .repeatForever(autoreverses: true),
-                                value: isAnimating
-                            )
                     }
+                    .frame(width: 300, height: 300)
                     
-                    // 呼吸阶段提示
                     Text(breathingPhase)
                         .font(.title2)
                         .fontWeight(.medium)
@@ -67,7 +90,6 @@ struct BreathingExerciseView: View {
                 
                 Spacer()
                 
-                // 音效选择
                 VStack(spacing: 15) {
                     Text("背景音效")
                         .font(.headline)
@@ -82,12 +104,12 @@ struct BreathingExerciseView: View {
                     .padding(.horizontal)
                 }
                 
-                // 控制按钮
                 Button(action: {
+                    isAnimating.toggle()
                     if isAnimating {
-                        stopBreathing()
+                        startBreathingCycle()
                     } else {
-                        startBreathing()
+                        stopBreathing()
                     }
                 }) {
                     Text(isAnimating ? "停止" : "开始")
@@ -102,37 +124,72 @@ struct BreathingExerciseView: View {
             }
             .padding()
         }
+        .onAppear(perform: setupParticles)
+        .onDisappear(perform: stopBreathing)
     }
     
-    func startBreathing() {
-        isAnimating = true
-        currentPhase = 0
-        updateBreathingPhase()
-        playBackgroundSound()
+    func setupParticles() {
+        // 初始化“土星环”粒子
+        for _ in 0..<300 {
+            let angle = Double.random(in: 0..<(2 * .pi))
+            let radius = CGFloat.random(in: 90...110)
+            let x = cos(angle) * radius + 150
+            let y = sin(angle) * radius + 150
+            let particle = Particle(size: .random(in: 2...5), position: CGPoint(x: x, y: y), opacity: .random(in: 0.2...0.7))
+            ringParticles.append(particle)
+        }
         
-        timer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { _ in
-            currentPhase = (currentPhase + 1) % breathingPattern.count
-            updateBreathingPhase()
+        // 初始化背景“星尘”
+        for _ in 0..<50 {
+            let x = CGFloat.random(in: 0...300)
+            let y = CGFloat.random(in: 0...300)
+            let particle = Particle(size: .random(in: 1...2), position: CGPoint(x: x, y: y), opacity: .random(in: 0.1...0.5))
+            dustParticles.append(particle)
+        }
+    }
+    
+    func startBreathingCycle() {
+        playBackgroundSound()
+        runPhase(at: 0)
+        
+        // 启动星尘闪烁
+        for i in 0..<dustParticles.count {
+            withAnimation(Animation.easeInOut(duration: Double.random(in: 2...5)).repeatForever()) {
+                dustParticles[i].opacity = .random(in: 0.1...0.5)
+            }
+        }
+    }
+
+    func runPhase(at index: Int) {
+        guard isAnimating, index < breathingPattern.count else {
+            if isAnimating { runPhase(at: 0) } // 循环
+            return
+        }
+
+        let phase = breathingPattern[index]
+        breathingPhase = phase.name
+
+        withAnimation(.easeInOut(duration: phase.duration)) {
+            circleScale = phase.scale
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + phase.duration) {
+            runPhase(at: index + 1)
         }
     }
     
     func stopBreathing() {
         isAnimating = false
-        timer?.invalidate()
-        timer = nil
         breathingPhase = "准备开始"
         audioPlayer?.stop()
-    }
-    
-    func updateBreathingPhase() {
-        breathingPhase = breathingPattern[currentPhase].0
+        
+        withAnimation(.easeInOut(duration: 1.0)) {
+            circleScale = 1.0
+        }
     }
     
     func playBackgroundSound() {
         guard selectedSound != "无" else { return }
-        
-        // 这里应该添加实际的音频文件
-        // 由于这是演示，我们只是模拟音效播放
         print("播放 \(selectedSound) 音效")
     }
 }
