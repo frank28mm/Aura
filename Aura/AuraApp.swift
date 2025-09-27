@@ -1,32 +1,37 @@
-//
-//  AuraApp.swift
-//  Aura
-//
-//  Created by 杨吉祥 on 2025/9/27.
-//
-
 import SwiftUI
-import SwiftData
 
 @main
 struct AuraApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
-
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainTabView()
         }
-        .modelContainer(sharedModelContainer)
+    }
+}
+
+struct MainTabView: View {
+    @State private var selectedTab = 0
+    
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            BreathingExerciseView()
+                .tabItem {
+                    Label("呼吸之锚", systemImage: "lungs")
+                }
+                .tag(0)
+            
+            GroundingExerciseView()
+                .tabItem {
+                    Label("感官接地", systemImage: "hand.raised")
+                }
+                .tag(1)
+            
+            AIChatView()
+                .tabItem {
+                    Label("回声树洞", systemImage: "bubble.left.and.bubble.right.fill")
+                }
+                .tag(2)
+        }
+        .accentColor(.teal)
     }
 }

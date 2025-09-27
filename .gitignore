@@ -1,0 +1,21 @@
+# Xcode
+.DS_Store
+/build/
+/DerivedData/
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcshareddata/
+*.xcworkspace/xcuserdata/
+*.swiftpm/
+*~
+
+# Swift Package Manager
+.build/
+Packages/
+SourcePackages/
+
+# Cocoapods
+Pods/
+
+# Screenshots
+*.png
