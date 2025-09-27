@@ -17,6 +17,7 @@ struct BreathingExerciseView: View {
     // 粒子状态
     @State private var ringParticles: [Particle] = []
     @State private var dustParticles: [Particle] = []
+    @State private var satelliteParticles: [Particle] = []
     
     // 呼吸阶段
     @State private var breathingPhase = "准备开始"
@@ -68,6 +69,13 @@ struct BreathingExerciseView: View {
                         // 构成“土星环”的粒子
                         ZStack {
                             ForEach(ringParticles) { particle in
+                                Circle()
+                                    .fill(Color.teal.opacity(particle.opacity))
+                                    .frame(width: particle.size, height: particle.size)
+                                    .position(particle.position)
+                            }
+                            
+                            ForEach(satelliteParticles) { particle in
                                 Circle()
                                     .fill(Color.teal.opacity(particle.opacity))
                                     .frame(width: particle.size, height: particle.size)
@@ -141,6 +149,26 @@ struct BreathingExerciseView: View {
             ringParticles.append(particle)
         }
         
+        // 初始化内部“卫星”粒子
+        for _ in 0..<300 {
+            let angle = Double.random(in: 0..<(2 * .pi))
+            let radius = CGFloat.random(in: 80...88) // 更靠近主环
+            let x = cos(angle) * radius + 150
+            let y = sin(angle) * radius + 150
+            let particle = Particle(size: .random(in: 0.5...1.5), position: CGPoint(x: x, y: y), opacity: .random(in: 0.1...0.4))
+            satelliteParticles.append(particle)
+        }
+
+        // 初始化外部“卫星”粒子
+        for _ in 0..<300 {
+            let angle = Double.random(in: 0..<(2 * .pi))
+            let radius = CGFloat.random(in: 112...120) // 更靠近主环
+            let x = cos(angle) * radius + 150
+            let y = sin(angle) * radius + 150
+            let particle = Particle(size: .random(in: 0.5...1.5), position: CGPoint(x: x, y: y), opacity: .random(in: 0.1...0.4))
+            satelliteParticles.append(particle)
+        }
+
         // 初始化背景“星尘”
         for _ in 0..<50 {
             let x = CGFloat.random(in: 0...300)
