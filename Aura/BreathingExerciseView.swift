@@ -20,6 +20,7 @@ struct BreathingExerciseView: View {
     
     // 呼吸阶段
     @State private var breathingPhase = "准备开始"
+    @State private var rotationAngle: Angle = .zero // 旋转角度
     
     // 音效
     @State private var audioPlayer: AVAudioPlayer?
@@ -73,6 +74,7 @@ struct BreathingExerciseView: View {
                                     .position(particle.position)
                             }
                         }
+                        .rotationEffect(rotationAngle) // 应用旋转效果
                         // 模糊效果已移除
                         .scaleEffect(circleScale) // 整体缩放以同步呼吸
                         
@@ -151,6 +153,11 @@ struct BreathingExerciseView: View {
     func startBreathingCycle() {
         playBackgroundSound()
         runPhase(at: 0)
+
+        // 开始旋转动画
+        withAnimation(Animation.linear(duration: 30).repeatForever(autoreverses: false)) {
+            rotationAngle = .degrees(-360)
+        }
         
         // 启动星尘闪烁
         for i in 0..<dustParticles.count {
@@ -185,6 +192,7 @@ struct BreathingExerciseView: View {
         
         withAnimation(.easeInOut(duration: 1.0)) {
             circleScale = 1.0
+            rotationAngle = .zero // 重置旋转
         }
     }
     
