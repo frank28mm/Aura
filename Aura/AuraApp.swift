@@ -16,19 +16,19 @@ struct MainTabView: View {
         TabView(selection: $selectedTab) {
             BreathingExerciseView()
                 .tabItem {
-                    Label("呼吸之锚", systemImage: "lungs")
+                    Label("呼吸之锚", systemImage: "infinity")
                 }
                 .tag(0)
             
             GroundingExerciseView()
                 .tabItem {
-                    Label("感官接地", systemImage: "hand.raised")
+                    Label("感官接地", systemImage: "leaf.fill")
                 }
                 .tag(1)
             
             AIChatView()
                 .tabItem {
-                    Label("回声树洞", systemImage: "bubble.left.and.bubble.right.fill")
+                    Label("回声树洞", systemImage: "waveform")
                 }
                 .tag(2)
         }
