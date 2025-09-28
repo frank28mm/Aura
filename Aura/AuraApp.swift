@@ -1,7 +1,23 @@
 import SwiftUI
 
+import SwiftUI
+import AVFoundation
+
 @main
 struct AuraApp: App {
+    
+    init() {
+        // 配置音频会话以支持后台播放
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.playback, mode: .default)
+            try audioSession.setActive(true)
+            print("Audio session configured for background playback.")
+        } catch {
+            print("Failed to set up audio session for background playback: \(error.localizedDescription)")
+        }
+    }
+    
     var body: some Scene {
         WindowGroup {
             MainTabView()

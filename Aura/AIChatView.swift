@@ -11,7 +11,7 @@ struct ChatRequest: Codable {
     let messages: [APIChatMessage]
     let temperature: Double
     let max_tokens: Int
-    let stream: Bool
+    let stream: Bool = true // 默认开启流式响应
 }
 
 struct APIChatMessage: Codable {
@@ -19,6 +19,7 @@ struct APIChatMessage: Codable {
     let content: String
 }
 
+// 非流式响应模型 (保留,以备不时之需)
 struct ChatResponse: Codable {
     let choices: [ChatChoice]
 }
@@ -27,99 +28,123 @@ struct ChatChoice: Codable {
     let message: APIChatMessage
 }
 
+// 流式响应模型
+struct StreamChatResponse: Codable {
+    let choices: [StreamChoice]
+}
+
+struct StreamChoice: Codable {
+    let delta: StreamDelta
+    let finish_reason: String?
+}
+
+struct StreamDelta: Codable {
+    let content: String?
+}
+
+
 // API服务类
-class KimiAPIService {
+class KimiAPIService: NSObject {
     static let shared = KimiAPIService()
     
-    private init() {}
-    
-    func sendMessageToKimi(_ message: String, completion: @escaping (Result<String, Error>) -> Void) {
-        guard !Secrets.apiKey.contains("your-real-api-key") else {
-            completion(.failure(NSError(domain: "", code: 401, userInfo: [NSLocalizedDescriptionKey: "请先设置有效的KIMI API密钥"])))
-            return
-        }
-        
-        let url = URL(string: "\(Secrets.baseURL)/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(Secrets.apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        // 构建系统提示词，让KIMI扮演心理健康助手
-        let systemPrompt = """
-        你是一个专业的心理健康助手，专门帮助用户处理情绪问题、压力和心理健康挑战。
-        
-        你的特点：
-        - 温暖、同理心强、不带评判
-        - 基于心理学原理（CBT、正念等）提供建议
-        - 鼓励用户表达情绪，提供情绪验证
-        - 提供实用的应对策略和放松技巧
-        - 在适当时候推荐呼吸练习或正念技巧
-        - 使用中文回复，保持自然对话风格
-        
-        重要原则：
-        - 不提供医疗诊断或药物建议
-        - 鼓励寻求专业帮助当需要时
-        - 保持积极但现实的观点
-        - 尊重用户的感受和经历
-        
-        回复风格：像一位理解你的朋友，提供支持和实用建议。
-        """
-        
-        let chatRequest = ChatRequest(
-            model: Secrets.modelName, // 使用配置的模型名称
-            messages: [
-                APIChatMessage(role: "system", content: systemPrompt),
-                APIChatMessage(role: "user", content: message)
-            ],
-            temperature: 0.7,
-            max_tokens: 500,
-            stream: false
-        )
-        
-        do {
-            request.httpBody = try JSONEncoder().encode(chatRequest)
-        } catch {
-            completion(.failure(error))
-            return
-        }
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
+    func streamMessageToKimi(_ message: String) -> AsyncThrowingStream<String, Error> {
+        return AsyncThrowingStream { continuation in
+            guard !Secrets.apiKey.contains("your-real-api-key") else {
+                continuation.finish(throwing: NSError(domain: "", code: 401, userInfo: [NSLocalizedDescriptionKey: "请先设置有效的KIMI API密钥"]))
                 return
             }
             
-            guard let data = data else {
-                completion(.failure(NSError(domain: "", code: 500, userInfo: [NSLocalizedDescriptionKey: "没有收到响应数据"])))
-                return
-            }
+            let url = URL(string: "\(Secrets.baseURL)/chat/completions")!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(Secrets.apiKey)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            
+            let systemPrompt = """
+            你是一个专业的心理健康助手，专门帮助用户处理情绪问题、压力和心理健康挑战。
+            你的特点：温暖、同理心强、不带评判、基于心理学原理（CBT、正念等）提供建议、鼓励用户表达情绪、提供实用的应对策略和放松技巧、在适当时候推荐呼吸练习或正念技巧、使用中文回复，保持自然对话风格。
+            重要原则：不提供医疗诊断或药物建议、鼓励寻求专业帮助当需要时、保持积极但现实的观点、尊重用户的感受和经历。
+            回复风格：像一位理解你的朋友，提供支持和实用建议。
+            """
+            
+            let chatRequest = ChatRequest(
+                model: Secrets.modelName,
+                messages: [
+                    APIChatMessage(role: "system", content: systemPrompt),
+                    APIChatMessage(role: "user", content: message)
+                ],
+                temperature: 0.7,
+                max_tokens: 500
+            )
             
             do {
-                let chatResponse = try JSONDecoder().decode(ChatResponse.self, from: data)
-                if let responseMessage = chatResponse.choices.first?.message.content {
-                    completion(.success(responseMessage))
-                } else {
-                    completion(.failure(NSError(domain: "", code: 500, userInfo: [NSLocalizedDescriptionKey: "解析响应失败"])))
-                }
+                request.httpBody = try JSONEncoder().encode(chatRequest)
             } catch {
-                // 如果解析失败，尝试获取错误信息
-                if let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-                   let errorMessage = json["error"] as? [String: Any],
-                   let message = errorMessage["message"] as? String {
-                    completion(.failure(NSError(domain: "", code: 500, userInfo: [NSLocalizedDescriptionKey: message])))
-                } else {
-                    completion(.failure(error))
-                }
+                continuation.finish(throwing: error)
+                return
             }
-        }.resume()
+            
+            let delegate = StreamingSessionDelegate(continuation: continuation)
+            let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+            let task = session.dataTask(with: request)
+            task.resume()
+
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+            }
+        }
     }
 }
+
+class StreamingSessionDelegate: NSObject, URLSessionDataDelegate {
+    var continuation: AsyncThrowingStream<String, Error>.Continuation
+    private var buffer = Data()
+
+    init(continuation: AsyncThrowingStream<String, Error>.Continuation) {
+        self.continuation = continuation
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        let lines = String(decoding: data, as: UTF8.self).split(separator: "\n")
+        for line in lines {
+            if line.hasPrefix("data: ") {
+                let jsonString = line.dropFirst(6)
+                if jsonString == "[DONE]" {
+                    continuation.finish()
+                    return
+                }
+                
+                guard let jsonData = jsonString.data(using: .utf8) else { continue }
+                
+                do {
+                    let streamResponse = try JSONDecoder().decode(StreamChatResponse.self, from: jsonData)
+                    if let token = streamResponse.choices.first?.delta.content {
+                        continuation.yield(token)
+                    }
+                    if streamResponse.choices.first?.finish_reason != nil {
+                        continuation.finish()
+                    }
+                } catch {
+                    // 忽略JSON解析错误，因为数据块可能不完整
+                }
+            }
+        }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let error = error {
+            continuation.finish(throwing: error)
+        } else {
+            continuation.finish()
+        }
+    }
+}
+
 
 // AI聊天消息模型
 struct ChatMessage: Identifiable, Codable {
     let id = UUID()
-    let content: String
+    var content: String // 改为 var 以便追加内容
     let isUser: Bool
     let timestamp: Date
     
@@ -131,6 +156,7 @@ struct ChatMessage: Identifiable, Codable {
 }
 
 // AI聊天视图模型
+@MainActor // 确保所有UI更新都在主线程
 class AIChatViewModel: ObservableObject {
     @Published var messages: [ChatMessage] = []
     @Published var currentInput: String = ""
@@ -158,30 +184,34 @@ class AIChatViewModel: ObservableObject {
         let userInput = currentInput
         currentInput = ""
         isTyping = true
-        
-        // 模拟AI回复延迟
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            self.generateAIResponse(to: userInput)
-        }
+        self.generateAIResponse(to: userInput)
     }
     
     private func generateAIResponse(to userMessage: String) {
-        // 使用KIMI API生成响应
-        KimiAPIService.shared.sendMessageToKimi(userMessage) { [weak self] result in
-            DispatchQueue.main.async {
-                self?.isTyping = false
-                
-                switch result {
-                case .success(let response):
-                    self?.addAIMessage(response)
-                case .failure(let error):
-                    // 如果API调用失败，回退到本地响应
-                    print("KIMI API调用失败: \(error.localizedDescription)")
-                    // MODIFICATION: Display the actual error in the UI
-                    let fallbackMessage = "🤖 API调用失败: \(error.localizedDescription)\n\n💡 已切换到本地回复模式。"
-                    self?.addAIMessage(fallbackMessage)
+        let startTime = Date()
+        
+        // 1. 添加一个空的AI消息用于接收流式数据
+        let emptyAIMessage = ChatMessage(content: "", isUser: false)
+        messages.append(emptyAIMessage)
+        let messageIndex = messages.count - 1
+
+        Task {
+            do {
+                // 2. 调用流式API并遍历返回的文字片段
+                let stream = KimiAPIService.shared.streamMessageToKimi(userMessage)
+                for try await token in stream {
+                    // 3. 将新的文字片段追加到最后一条消息中
+                    messages[messageIndex].content += token
                 }
+            } catch {
+                // 4. 如果出错，更新消息内容为错误提示
+                messages[messageIndex].content = "🤖 API调用失败: \(error.localizedDescription)"
             }
+            
+            // 5. 标记为输入完成，并打印总耗时
+            isTyping = false
+            let duration = Date().timeIntervalSince(startTime)
+            print("KIMI API stream finished in: \(String(format: "%.2f", duration)) seconds")
         }
     }
     
