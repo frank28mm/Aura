@@ -137,6 +137,9 @@ struct BreathingExerciseView: View {
             startIdleAnimation()
         }
         .onDisappear(perform: stopBreathing)
+        .onChange(of: selectedSound) { _ in
+            playBackgroundSound()
+        }
     }
     
     func startIdleAnimation() {
@@ -188,7 +191,6 @@ struct BreathingExerciseView: View {
     }
     
     func startBreathingCycle() {
-        playBackgroundSound()
         runPhase(at: 0)
 
         // 从当前角度平滑过渡到运动旋转
@@ -225,7 +227,6 @@ struct BreathingExerciseView: View {
     func stopBreathing() {
         isAnimating = false
         breathingPhase = "准备开始"
-        audioPlayer?.stop()
         
         withAnimation(.easeInOut(duration: 1.0)) {
             circleScale = 1.0
@@ -240,8 +241,39 @@ struct BreathingExerciseView: View {
     }
     
     func playBackgroundSound() {
+        // 停止当前可能在播放的音效
+        audioPlayer?.stop()
+
+        // 如果选择“无”，则不播放任何音效
         guard selectedSound != "无" else { return }
-        print("播放 \(selectedSound) 音效")
+
+        var soundName: String?
+        var soundExtension: String?
+
+        switch selectedSound {
+        case "小雨":
+            soundName = "rain"
+            soundExtension = "mp3"
+        case "森林":
+            soundName = "forest"
+            soundExtension = "MP3"
+        case "海浪":
+            soundName = "waves"
+            soundExtension = "wav"
+        default:
+            break
+        }
+
+        if let soundName = soundName, let soundExtension = soundExtension,
+           let url = Bundle.main.url(forResource: soundName, withExtension: soundExtension) {
+            do {
+                audioPlayer = try AVAudioPlayer(contentsOf: url)
+                audioPlayer?.numberOfLoops = -1 // 无限循环
+                audioPlayer?.play()
+            } catch {
+                print("无法加载音效文件: \(error.localizedDescription)")
+            }
+        }
     }
 }
 
