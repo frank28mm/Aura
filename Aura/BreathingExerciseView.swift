@@ -55,13 +55,14 @@ struct BreathingExerciseView: View {
                 Spacer()
                 
                 VStack(spacing: 15) {
-                    Text("背景音效")
+                    Text("白噪音")
                         .font(.headline)
                         .foregroundColor(.teal)
                     
-                    Picker("音效", selection: $selectedSound) {
+                    Picker("白噪音", selection: $selectedSound) {
                         ForEach(soundOptions, id: \.self) { sound in
-                            Text(sound).tag(sound)
+                            Image(systemName: iconForSound(sound))
+                                .tag(sound)
                         }
                     }
                     .pickerStyle(SegmentedPickerStyle())
@@ -131,6 +132,16 @@ struct BreathingExerciseView: View {
         
         withAnimation(.easeInOut(duration: 1.0)) {
             circleScale = 1.0
+        }
+    }
+    
+    private func iconForSound(_ sound: String) -> String {
+        switch sound {
+        case "无": return "speaker.slash.fill"
+        case "小雨": return "cloud.drizzle.fill"
+        case "森林": return "mountain.2.fill"
+        case "海浪": return "water.waves"
+        default: return "questionmark"
         }
     }
     
