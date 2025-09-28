@@ -1,23 +1,10 @@
 import SwiftUI
 import AVFoundation
 
-// 定义单个粒子的数据结构
-private struct Particle: Identifiable {
-    let id = UUID()
-    var size: CGFloat
-    var position: CGPoint
-    var opacity: Double
-}
-
 struct BreathingExerciseView: View {
     // 动画状态
     @State private var circleScale: CGFloat = 1.0
     @State private var isAnimating = false
-    
-    // 粒子状态
-    @State private var ringParticles: [Particle] = []
-    @State private var dustParticles: [Particle] = []
-    @State private var satelliteParticles: [Particle] = []
     
     // 呼吸阶段
     @State private var breathingPhase = "准备开始"
@@ -55,45 +42,14 @@ struct BreathingExerciseView: View {
                         .fontWeight(.bold)
                         .foregroundColor(.teal)
                     
-                    // 粒子动画区域
-                    ZStack {
-                        // 背景里的“星尘”
-                        ForEach(dustParticles) { particle in
-                            Circle()
-                                .fill(Color.white.opacity(particle.opacity))
-                                .frame(width: particle.size, height: particle.size)
-                                .position(particle.position)
-                                .animation(isAnimating ? Animation.easeInOut(duration: Double.random(in: 2...4)).repeatForever() : .default, value: isAnimating)
-                        }
-
-                        // 构成“土星环”的粒子
-                        ZStack {
-                            ForEach(ringParticles) { particle in
-                                Circle()
-                                    .fill(Color.teal.opacity(particle.opacity))
-                                    .frame(width: particle.size, height: particle.size)
-                                    .position(particle.position)
-                            }
-                            
-                            ForEach(satelliteParticles) { particle in
-                                Circle()
-                                    .fill(Color.teal.opacity(particle.opacity))
-                                    .frame(width: particle.size, height: particle.size)
-                                    .position(particle.position)
-                            }
-                        }
-                        .rotationEffect(rotationAngle) // 应用旋转效果
-                        // 模糊效果已移除
-                        .scaleEffect(circleScale) // 整体缩放以同步呼吸
-                        
-                    }
-                    .frame(width: 300, height: 300)
+                    // 使用可重用的粒子视图
+                    ParticleRingView(scale: $circleScale, rotationAngle: $rotationAngle)
+                        .frame(width: 300, height: 300)
                     
                     Text(breathingPhase)
                         .font(.title2)
                         .fontWeight(.medium)
                         .foregroundColor(.teal)
-                        // 白色背景已移除
                 }
                 
                 Spacer()
@@ -133,7 +89,6 @@ struct BreathingExerciseView: View {
             .padding()
         }
         .onAppear {
-            setupParticles()
             startIdleAnimation()
         }
         .onDisappear(perform: stopBreathing)
@@ -148,62 +103,8 @@ struct BreathingExerciseView: View {
         }
     }
     
-    func setupParticles() {
-        guard ringParticles.isEmpty else { return } // 防止重复生成
-        
-        // 初始化“土星环”粒子
-        for _ in 0..<600 { // 增加粒子数量
-            let angle = Double.random(in: 0..<(2 * .pi))
-            let radius = CGFloat.random(in: 90...110)
-            let x = cos(angle) * radius + 150
-            let y = sin(angle) * radius + 150
-            let particle = Particle(size: .random(in: 1...3), position: CGPoint(x: x, y: y), opacity: .random(in: 0.2...0.7)) // 减小粒子大小
-            ringParticles.append(particle)
-        }
-        
-        // 初始化内部“卫星”粒子
-        for _ in 0..<300 {
-            let angle = Double.random(in: 0..<(2 * .pi))
-            let radius = CGFloat.random(in: 80...88) // 更靠近主环
-            let x = cos(angle) * radius + 150
-            let y = sin(angle) * radius + 150
-            let particle = Particle(size: .random(in: 0.5...1.5), position: CGPoint(x: x, y: y), opacity: .random(in: 0.1...0.4))
-            satelliteParticles.append(particle)
-        }
-
-        // 初始化外部“卫星”粒子
-        for _ in 0..<300 {
-            let angle = Double.random(in: 0..<(2 * .pi))
-            let radius = CGFloat.random(in: 112...120) // 更靠近主环
-            let x = cos(angle) * radius + 150
-            let y = sin(angle) * radius + 150
-            let particle = Particle(size: .random(in: 0.5...1.5), position: CGPoint(x: x, y: y), opacity: .random(in: 0.1...0.4))
-            satelliteParticles.append(particle)
-        }
-
-        // 初始化背景“星尘”
-        for _ in 0..<50 {
-            let x = CGFloat.random(in: 0...300)
-            let y = CGFloat.random(in: 0...300)
-            let particle = Particle(size: .random(in: 1...2), position: CGPoint(x: x, y: y), opacity: .random(in: 0.1...0.5))
-            dustParticles.append(particle)
-        }
-    }
-    
     func startBreathingCycle() {
         runPhase(at: 0)
-
-        // 从当前角度平滑过渡到运动旋转
-        withAnimation(Animation.linear(duration: 30).repeatForever(autoreverses: false)) {
-            rotationAngle = .degrees(-360)
-        }
-        
-        // 启动星尘闪烁
-        for i in 0..<dustParticles.count {
-            withAnimation(Animation.easeInOut(duration: Double.random(in: 2...5)).repeatForever()) {
-                dustParticles[i].opacity = .random(in: 0.1...0.5)
-            }
-        }
     }
 
     func runPhase(at index: Int) {
@@ -230,13 +131,6 @@ struct BreathingExerciseView: View {
         
         withAnimation(.easeInOut(duration: 1.0)) {
             circleScale = 1.0
-            rotationAngle = .zero // 重置旋转
-        }
-
-        // 1秒后恢复待机旋转
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            guard !isAnimating else { return }
-            startIdleAnimation()
         }
     }
     

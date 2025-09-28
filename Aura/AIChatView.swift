@@ -316,6 +316,10 @@ struct AIChatView: View {
     @FocusState private var isTextFieldFocused: Bool
     @State private var showingQuickMood = false
     
+    // 为粒子动画添加状态
+    @State private var rotationAngle: Angle = .zero
+    @State private var scale: CGFloat = 1.0
+    
     var body: some View {
         ZStack {
             // 背景渐变
@@ -325,6 +329,16 @@ struct AIChatView: View {
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
+
+            // 粒子动画背景
+            ParticleRingView(
+                scale: $scale,
+                rotationAngle: $rotationAngle,
+                colors: [Color.purple, Color.blue],
+                radius: 130 // 调大直径
+            )
+            .frame(width: 350, height: 350) // 相应调大框架
+            .opacity(0.7)
             
             VStack(spacing: 0) {
                 // 统一风格的标题
@@ -447,6 +461,12 @@ struct AIChatView: View {
             }
         } message: {
             Text("确定要清空所有聊天记录吗？")
+        }
+        .onAppear {
+            // 启动背景旋转动画
+            withAnimation(Animation.linear(duration: 60).repeatForever(autoreverses: false)) {
+                rotationAngle = .degrees(360)
+            }
         }
     }
 }
